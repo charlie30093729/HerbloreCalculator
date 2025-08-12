@@ -54,7 +54,13 @@ namespace HerbloreCalculator
                 {
                     Console.WriteLine($"Could not fetch XP for {Rsn}, assuming target from 0 XP.");
                 }
-                
+
+                // Worst = buy inputs at high; sell outputs at low (impatient insta-buy/sell)
+                // Average = midpoint of high/low on both sides
+                // Best = buy inputs at low; sell outputs at high (patient flipping / tight margins)
+
+                Console.WriteLine(" Worst = Buy high, sell low (impatient) \n Average = Average.... \n Best = Buy inputs low, sell high. \n");
+
                 // 2) Pull all latest prices in a single API call (OSRS Wiki)
                 var prices = await PriceFetcher.GetLatestPricesAsync();
 
