@@ -1,0 +1,1 @@
+This program pulls data directly from the runescape.com/Wiki/prices and calculates the cost, profit margins, xp and more for potions on the game Old School Runescape. Currently only has two potions implements on the auto pull.
