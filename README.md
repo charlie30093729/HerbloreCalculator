@@ -14,8 +14,12 @@ Automated Refresh – Updates every 60 seconds with clear, formatted output.
 
 Smart Pricing – Automatically determines reasonable “patient” buy prices instead of just averages.
 
+-----------------------------------------------------------
+
 
 -TODO: implement vyrewatch alternate accounts to tracker
+
+-------------------------------------------------------
 
 
 🕹 Usage
