@@ -17,9 +17,9 @@ namespace HerbloreCalculator.Services
         // If the market spread is "wide", we'll place offers this % into the spread from the better side.
         // e.g., Buy = low + 20% * (high - low); Sell = high - 20% * (high - low).
         // Tight markets (small spread) default to low (buy) / high (sell).
-        private const double OfferPctIntoSpread = 0.20;
-        private const double TightSpreadAbs = 50.0;        // <= 50 gp => treat as tight
-        private const double TightSpreadPctOfMid = 0.01;   // <= 1% of mid price => treat as tight
+        private const double OfferPctIntoSpread = 0.10;
+        private const double TightSpreadAbs = 20.0;        // <= 50 gp => treat as tight
+        private const double TightSpreadPctOfMid = 0.005;   // <= 1% of mid price => treat as tight
 
         public static void DisplayPotionReport(
             Potion potion,
