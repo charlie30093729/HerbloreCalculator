@@ -11,7 +11,7 @@ namespace HerbloreCalculator.Services
         private const double FourDoseChance = 0.15;        // 15% chance for +1 dose (4-dose proc)
         private const double SecondarySaveChance = 0.10;   // 10% chance to save secondary
         private const double ChargesPerChemAmulet = 10.0;  // 10 charges per chemistry amulet
-        private const double PotionsPerHour = 2600.0;      // throughput for XP/hr & GP/hr
+        private const double PotionsPerHour = 2525.0;      // throughput for XP/hr & GP/hr
 
         // ----- Offer suggestion tuning -----
         // If the market spread is "wide", we'll place offers this % into the spread from the better side.
