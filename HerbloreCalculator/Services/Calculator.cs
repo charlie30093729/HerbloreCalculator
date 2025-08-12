@@ -97,8 +97,9 @@ namespace HerbloreCalculator.Services
             // Expected total doses from one craft (3 base + 15% EV)
             double expectedDoses = 3.0 + FourDoseChance;
 
-            // Revenue if we always sell in the better form
-            double revenue = bestPerDose * expectedDoses;
+            // Revenue if we always sell in the better form, minus 2% GE tax
+            double revenue = (bestPerDose * expectedDoses) * 0.98; // apply 2% tax
+
 
             // Expected chemistry charge cost per craft (only on proc)
             double chargeCostPerProc = chemAmmyBuyPrice > 0 ? chemAmmyBuyPrice / ChargesPerChemAmulet : 0.0;
@@ -111,6 +112,7 @@ namespace HerbloreCalculator.Services
             double gpPerXp = expectedProfit / xp;
             double totalGp = (remainingXp / xp) * expectedProfit;
             double gpPerHr = expectedProfit * PotionsPerHour;
+            double taxCost = (remainingXp / xp) * expectedProfit * 0.02;
 
             Console.Write($"{label,-8}");
 
@@ -137,6 +139,7 @@ namespace HerbloreCalculator.Services
             Console.ResetColor();
 
             Console.WriteLine();
+            
         }
 
         // ---------- GE offer helper (suggested prices) ----------
