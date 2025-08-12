@@ -1,17 +1,53 @@
-This program pulls data directly from the runescape.com/Wiki/prices and calculates the cost, profit margins, xp and more for data on the game: Old School Runescape.
+Herblore Calculator for Old School RuneScape
+A C# console application that pulls live Grand Exchange price data from the OSRS Wiki API to calculate potion crafting costs, profit margins, XP per hour, and more — all in real time.
 
+✨ Features
+Live OSRS Market Data – Fetches up-to-date high/low prices for any item via the OSRS Wiki API.
 
-v1.5 - Added potion ingrediants suggested pricing for buying/selling. 
-     - Fixed refresh bug.
-     - Fixed window size and formatting.
+Potion Profit & XP Calculator – Calculates cost per potion, GP/XP, GP/hour, and profit to target XP.
 
-v1.4 - Fixes to formatting. Additional comments.
+GE Offer Helper – Suggests optimal buy/sell offers for potion ingredients based on current market trends.
 
-v1.3 - Added List availabilty for any item ID on runescape, mini market tracker for regular items. More expandability, better maintainability.
+Custom Item Tracker – Track the prices of any item ID in real time (e.g., Blood Shards).
 
-v1.2 - Fixed potion class for more expandability.
+Automated Refresh – Updates every 60 seconds with clear, formatted output.
 
-v1.1 - Added runescape name puller and automatic XP lineup.
-     - Added Decanting calculation and costs.
+Smart Pricing – Automatically determines reasonable “patient” buy prices instead of just averages.
 
-v1.0 - Baseline, 2 potion automatic puller.
+Window Size Fix & Refresh Cleanup – Always opens at a readable size and clears output on refresh.
+
+📸 Screenshot
+
+📦 Installation
+Clone the repository:
+
+bash
+Copy
+Edit
+git clone https://github.com/charlie30093729/HerbloreCalculator.git
+Open in Visual Studio.
+
+Build and run the project.
+
+🕹 Usage
+Update your RuneScape name in Program.cs to automatically fetch your current Herblore XP.
+
+Add or remove potions by modifying the potions list in Program.cs.
+
+Add any item IDs you want to track in the TrackedItems list.
+
+📜 Version History
+v1.5 – Added potion ingredient suggested pricing, fixed refresh bug, fixed window size and formatting.
+
+v1.4 – Formatting improvements, more code comments.
+
+v1.3 – Added custom item tracker, better expandability and maintainability.
+
+v1.2 – Improved potion class for easier expansion.
+
+v1.1 – Added RuneScape name puller, XP tracker, decanting calculations.
+
+v1.0 – Initial release with 2 potions and live data pull.
+
+📄 License
+MIT License – free to use, modify, and distribute.
