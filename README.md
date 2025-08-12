@@ -36,6 +36,3 @@ v1.2 – Improved potion class for easier expansion.
 v1.1 – Added RuneScape name puller, XP tracker, decanting calculations.
 
 v1.0 – Initial release with 2 potions and live data pull.
-
-📄 License
-MIT License – free to use, modify, and distribute.
