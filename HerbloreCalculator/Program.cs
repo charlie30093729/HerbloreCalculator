@@ -42,7 +42,7 @@ namespace HerbloreCalculator
             {
                 ClearScreen(); // <- robust clear (screen + scrollback)
 
-                Console.WriteLine($"Bottleos Herb Calc V1.3 - {DateTime.Now}");
+                Console.WriteLine($"Bottleos Herb Calculator - {DateTime.Now}");
                 Console.WriteLine();
 
                 // 1) Pull your current Herblore XP (falls back to 0 if unranked)
