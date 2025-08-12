@@ -1,5 +1,5 @@
 Herblore Calculator for Old School RuneScape
-A C# console application that pulls live Grand Exchange price data from the OSRS Wiki API to calculate potion crafting costs, profit margins, XP per hour, and more — all in real time.
+A C# console application that pulls live Grand Exchange price data from the OSRS Wiki API to calculate potion crafting costs, profit margins, XP per hour, and more,all in real time.
 
 ✨ Features
 Live OSRS Market Data – Fetches up-to-date high/low prices for any item via the OSRS Wiki API.
@@ -14,6 +14,8 @@ Automated Refresh – Updates every 60 seconds with clear, formatted output.
 
 Smart Pricing – Automatically determines reasonable “patient” buy prices instead of just averages.
 
+
+-TODO: implement vyrewatch alternate accounts to tracker
 
 
 🕹 Usage
