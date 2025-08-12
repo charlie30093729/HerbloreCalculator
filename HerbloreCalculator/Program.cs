@@ -1,57 +1,64 @@
-﻿using HerbloreCalculator.Models;
-using HerbloreCalculator.Services;
-using HerbloreCalculator.Utils;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using HerbloreCalculator.Models;
+using HerbloreCalculator.Services;
 
 namespace HerbloreCalculator
 {
     class Program
     {
-        static readonly List<Potion> potions = new List<Potion>
-        {
-            new Potion
-            {
-                Name = "Saradomin brew(3)",
-                Xp = 180,
-                BaseId = 3002,    // Toadflax potion (unf)
-                SecondaryId = 6693, // Crushed nest
-                Output3Id = 6687, // Saradomin brew(3)
-                Output4Id = 6685  // Saradomin brew(4)
-            },
-            new Potion
-            {
-                Name = "Super restore(3)",
-                Xp = 142.5,
-                BaseId = 3004,    // Snapdragon potion (unf)
-                SecondaryId = 223,  // Red spiders' eggs
-                Output3Id = 3026, // Super restore(3)
-                Output4Id = 3024  // Super restore(4)
-            }
-        };
+        private const string Rsn = "bottleo";  // your RSN here
+        private const double TargetXp = 200_000_000;
+        private const int RefreshSeconds = 60;
 
-        static async Task Main()
+        private const int ChemAmuletId = 21163; // Amulet of chemistry
+
+        static async Task Main(string[] args)
         {
+            var potions = new List<Potion>
+                {
+                    new Potion("Saradomin brew(3)", 3002, 6693, 6687, 6685, 180.0),
+                    new Potion("Super restore(3)", 3004, 223, 3026, 3024, 142.5)
+                };
+
+
             while (true)
             {
                 Console.Clear();
-                try
-                {
-                    var prices = await PriceFetcher.GetLatestPricesAsync();
+                Console.WriteLine($"OSRS Herblore Profit Calculator - {DateTime.Now}");
+                Console.WriteLine();
 
-                    foreach (var potion in potions)
-                    {
-                        Calculator.DisplayPotionReport(potion, prices);
-                        Console.WriteLine();
-                    }
-                }
-                catch (Exception ex)
+                double remainingXp = TargetXp;
+                var currentXp = await HiscoreFetcher.GetHerbloreXpAsync(Rsn);
+                if (currentXp.HasValue)
                 {
-                    Console.WriteLine($"Error fetching data: {ex.Message}");
+                    remainingXp = Math.Max(0, TargetXp - currentXp.Value);
+                    Console.WriteLine($"{Rsn} current Herblore XP: {currentXp:N0}, remaining: {remainingXp:N0}");
+                }
+                else
+                {
+                    Console.WriteLine($"Could not fetch XP for {Rsn}, assuming target from 0 XP.");
                 }
 
-                await Task.Delay(60000); // 60s refresh
+                var prices = await PriceFetcher.GetLatestPricesAsync();
+
+                prices.TryGetValue(ChemAmuletId, out var chemAmmyPrice);
+
+                Console.WriteLine();
+                foreach (var potion in potions)
+                {
+                    Calculator.DisplayPotionReport(
+                        potion,
+                        prices,
+                        remainingXp > 0 ? remainingXp : TargetXp,
+                        chemAmmyPrice
+                    );
+                    Console.WriteLine();
+                }
+
+                Console.WriteLine($"Next update in {RefreshSeconds} seconds...");
+                await Task.Delay(RefreshSeconds * 1000);
             }
         }
     }
