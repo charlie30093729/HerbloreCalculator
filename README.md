@@ -14,20 +14,7 @@ Automated Refresh – Updates every 60 seconds with clear, formatted output.
 
 Smart Pricing – Automatically determines reasonable “patient” buy prices instead of just averages.
 
-Window Size Fix & Refresh Cleanup – Always opens at a readable size and clears output on refresh.
 
-📸 Screenshot
-
-📦 Installation
-Clone the repository:
-
-bash
-Copy
-Edit
-git clone https://github.com/charlie30093729/HerbloreCalculator.git
-Open in Visual Studio.
-
-Build and run the project.
 
 🕹 Usage
 Update your RuneScape name in Program.cs to automatically fetch your current Herblore XP.
@@ -37,6 +24,7 @@ Add or remove potions by modifying the potions list in Program.cs.
 Add any item IDs you want to track in the TrackedItems list.
 
 📜 Version History
+
 v1.5 – Added potion ingredient suggested pricing, fixed refresh bug, fixed window size and formatting.
 
 v1.4 – Formatting improvements, more code comments.
