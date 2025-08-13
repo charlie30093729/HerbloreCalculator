@@ -5,21 +5,28 @@ using HerbloreCalculator.Utils;
 
 namespace HerbloreCalculator.Services
 {
+    public enum FlowMode { Normal = 0, Fast = 1, Flow = 2 } // Flow = turbo / instant-ish
+
     public static class Calculator
     {
+        // ***** Public mode switch (set by Program via hotkeys) *****
+        public static FlowMode Mode { get; set; } = FlowMode.Normal;
+
         // ----- Fixed mechanics (your spec) -----
         private const double FourDoseChance = 0.15;        // 15% chance for +1 dose (4-dose proc)
         private const double SecondarySaveChance = 0.10;   // 10% chance to save secondary
         private const double ChargesPerChemAmulet = 10.0;  // 10 charges per chemistry amulet
         private const double PotionsPerHour = 2525.0;      // throughput for XP/hr & GP/hr
 
-        // ----- Offer suggestion tuning -----
-        // If the market spread is "wide", we'll place offers this % into the spread from the better side.
-        // e.g., Buy = low + 20% * (high - low); Sell = high - 20% * (high - low).
-        // Tight markets (small spread) default to low (buy) / high (sell).
-        private const double OfferPctIntoSpread = 0.10;
-        private const double TightSpreadAbs = 20.0;        // <= 50 gp => treat as tight
-        private const double TightSpreadPctOfMid = 0.005;   // <= 1% of mid price => treat as tight
+        // ----- Tight market thresholds -----
+        private const double TightSpreadAbs = 20.0;        // <= 20 gp spread considered tight
+        private const double TightSpreadPctOfMid = 0.005;  // <= 0.5% of mid considered tight
+
+        // ----- Adaptive aggression (used in Normal mode) -----
+        private const double BasePctIntoSpread = 0.15;     // baseline depth into the spread
+        private const double MaxPctIntoSpread = 0.45;     // cap depth into the spread
+        private const double WideSpreadPct = 0.012;    // >= 1.2% of mid => "wide" market
+        private const int StaleMinutes = 10;       // quotes older than this => be more aggressive
 
         public static void DisplayPotionReport(
             Potion potion,
@@ -45,6 +52,12 @@ namespace HerbloreCalculator.Services
             Console.WriteLine($"=== {potion.Name} ===");
             Console.WriteLine($"XP per potion: {potion.Xp:N1}");
             Console.WriteLine($"XP per hour: {(potion.Xp * PotionsPerHour):N0}");
+
+            // Crafts required (ceil so we reach/overhit target XP)
+            long craftsNeeded = (long)Math.Ceiling(remainingXp / potion.Xp);
+            long basesNeeded = craftsNeeded; // 1 base per craft
+            long secondariesNeeded = (long)Math.Ceiling(craftsNeeded * (1.0 - SecondarySaveChance)); // ~10% saved
+            Console.WriteLine($"Need to target: {basesNeeded:N0} base potions, {secondariesNeeded:N0} secondaries");
 
             // Worst = buy inputs at high; sell outputs at low
             DisplayScenario(
@@ -73,10 +86,9 @@ namespace HerbloreCalculator.Services
                 chemAmmyPrice?.Low ?? 0
             );
 
-            // ----- GE offer helper (suggested offers) -----
-            // Decide which form sells better *on average* right now (per-dose).
+            // GE offer helper (mode-aware suggested offers, EV-based gp/xp in header)
             string sellingAs = DecideSellingFormByAverage(output3Price, output4Price);
-            DisplayOfferGuide(sellingAs, basePrice, secondaryPrice, output3Price, output4Price);
+            DisplayOfferGuide(sellingAs, basePrice, secondaryPrice, output3Price, output4Price, chemAmmyPrice, potion.Xp);
 
             Console.WriteLine($"Last updated: {output3Price.LastUpdate:dd MMM yyyy HH:mm:ss}");
         }
@@ -94,12 +106,11 @@ namespace HerbloreCalculator.Services
             double perDose4 = output4 / 4.0;
             double bestPerDose = Math.Max(perDose3, perDose4);
 
-            // Expected total doses from one craft (3 base + 15% EV)
+            // Expected doses from one craft (3 base + 15% EV)
             double expectedDoses = 3.0 + FourDoseChance;
 
-            // Revenue if we always sell in the better form, minus 2% GE tax
-            double revenue = (bestPerDose * expectedDoses) * 0.98; // apply 2% tax
-
+            // Revenue (after 2% GE tax)
+            double revenue = (bestPerDose * expectedDoses) * 0.98;
 
             // Expected chemistry charge cost per craft (only on proc)
             double chargeCostPerProc = chemAmmyBuyPrice > 0 ? chemAmmyBuyPrice / ChargesPerChemAmulet : 0.0;
@@ -112,7 +123,6 @@ namespace HerbloreCalculator.Services
             double gpPerXp = expectedProfit / xp;
             double totalGp = (remainingXp / xp) * expectedProfit;
             double gpPerHr = expectedProfit * PotionsPerHour;
-            double taxCost = (remainingXp / xp) * expectedProfit * 0.02;
 
             Console.Write($"{label,-8}");
 
@@ -139,66 +149,101 @@ namespace HerbloreCalculator.Services
             Console.ResetColor();
 
             Console.WriteLine();
-            
         }
 
-        // ---------- GE offer helper (suggested prices) ----------
-
-        /// <summary>
-        /// Suggests actionable GE prices to type based on current spread,
-        /// instead of just printing raw averages.
-        /// - Tight markets (small spread): buy at Low, sell at High.
-        /// - Wide markets: buy = Low + p% of spread, sell = High - p% of spread.
-        /// </summary>
+        // ---------- GE offer helper (mode-aware suggested prices + EV gp/xp) ----------
         private static void DisplayOfferGuide(
-            string sellingAs, PriceData baseP, PriceData secP, PriceData out3P, PriceData out4P)
+            string sellingAs,
+            PriceData baseP, PriceData secP, PriceData out3P, PriceData out4P,
+            PriceData chemP, double xp)
         {
+            // Mode-aware suggested offers
+            double buyBase = SuggestBuy(baseP);
+            double buySec = SuggestBuy(secP);
+            double sellOut = sellingAs.Contains("3") ? SuggestSell(out3P)
+                                                     : SuggestSell(out4P);
+
+            // EV gp/xp using the SAME formula as the table, but with our suggested prices
+            double perDoseSell = sellOut / (sellingAs.Contains("3") ? 3.0 : 4.0);
+            double expectedDoses = 3.0 + FourDoseChance;
+            double revenue = (perDoseSell * expectedDoses) * 0.98; // apply 2% GE tax
+
+            double chemAvg = chemP != null ? Avg(chemP.High, chemP.Low) : 0.0;
+            double chargeCostPerProc = chemAvg > 0 ? chemAvg / ChargesPerChemAmulet : 0.0;
+            double expectedChargeCost = FourDoseChance * chargeCostPerProc;
+
+            double expectedProfit = revenue - (buyBase + buySec + expectedChargeCost)
+                                    + (SecondarySaveChance * buySec);
+            double gpPerXpEV = expectedProfit / xp;
+
             Console.WriteLine();
-            Console.WriteLine("GE offer helper (suggested offers):");
-
-            // Buy suggestions for inputs (base + secondary)
-            double buyBase = SuggestBuy(baseP.High, baseP.Low);
-            double buySec = SuggestBuy(secP.High, secP.Low);
-
-            // Sell suggestion based on chosen output form
-            double sellPrice = sellingAs.Contains("3")
-                ? SuggestSell(out3P.High, out3P.Low)
-                : SuggestSell(out4P.High, out4P.Low);
-
+            Console.WriteLine($"GE offer helper (mode: {Mode}) (gp / xp = {gpPerXpEV:N2})");
             Console.WriteLine($"Buy base:       {buyBase:N0}");
             Console.WriteLine($"Buy secondary:  {buySec:N0}");
-            Console.WriteLine($"Sell {sellingAs}: {sellPrice:N0}");
+            Console.WriteLine($"Sell {sellingAs}: {sellOut:N0}");
             Console.WriteLine();
         }
 
-        /// <summary>
-        /// Suggest a buy price: if spread is tight, use Low; else move OfferPctIntoSpread into the spread.
-        /// </summary>
-        private static double SuggestBuy(double high, double low)
+        // ---------- Mode-aware suggestors ----------
+        private static double SuggestBuy(PriceData p)
         {
+            double high = p.High, low = p.Low;
             double mid = (high + low) / 2.0;
             double spread = Math.Max(0, high - low);
-            bool tight = spread <= TightSpreadAbs || (mid > 0 && spread <= TightSpreadPctOfMid * mid);
 
-            if (tight) return low; // tight market → low is fine (fills quickly)
-            return low + OfferPctIntoSpread * spread;
+            if (Mode == FlowMode.Flow) return Math.Max(low, high - 1); // near-ask (instant)
+            if (Mode == FlowMode.Fast)
+            {
+                double aggressive = low + 0.45 * spread + 2;
+                if (spread <= 10 || (mid > 0 && spread <= 0.003 * mid)) return low + 2;
+                return aggressive;
+            }
+
+            // Normal (adaptive)
+            bool tight = spread <= TightSpreadAbs || (mid > 0 && spread <= TightSpreadPctOfMid * mid);
+            if (tight) return low + 1;
+
+            double pct = BasePctIntoSpread;
+            double spreadPct = (mid > 0) ? (spread / mid) : 0.0;
+            double ageMin = Math.Max(0, (DateTime.Now - p.LastUpdate).TotalMinutes);
+
+            if (spreadPct >= WideSpreadPct) pct += 0.10;
+            if (ageMin >= StaleMinutes) pct += 0.10;
+            pct = Math.Min(pct, MaxPctIntoSpread);
+
+            return low + pct * spread + 1; // small overbid to beat the floor
         }
 
-        /// <summary>
-        /// Suggest a sell price: if spread is tight, use High; else move OfferPctIntoSpread into the spread (from the top).
-        /// </summary>
-        private static double SuggestSell(double high, double low)
+        private static double SuggestSell(PriceData p)
         {
+            double high = p.High, low = p.Low;
             double mid = (high + low) / 2.0;
             double spread = Math.Max(0, high - low);
-            bool tight = spread <= TightSpreadAbs || (mid > 0 && spread <= TightSpreadPctOfMid * mid);
 
-            if (tight) return high; // tight market → high is fine (fills quickly)
-            return high - OfferPctIntoSpread * spread;
+            if (Mode == FlowMode.Flow) return Math.Min(high, low + 1); // near-bid (instant)
+            if (Mode == FlowMode.Fast)
+            {
+                double aggressive = high - 0.45 * spread - 2;
+                if (spread <= 10 || (mid > 0 && spread <= 0.003 * mid)) return high - 2;
+                return aggressive;
+            }
+
+            // Normal (adaptive)
+            bool tight = spread <= TightSpreadAbs || (mid > 0 && spread <= TightSpreadPctOfMid * mid);
+            if (tight) return high - 1;
+
+            double pct = BasePctIntoSpread;
+            double spreadPct = (mid > 0) ? (spread / mid) : 0.0;
+            double ageMin = Math.Max(0, (DateTime.Now - p.LastUpdate).TotalMinutes);
+
+            if (spreadPct >= WideSpreadPct) pct += 0.10;
+            if (ageMin >= StaleMinutes) pct += 0.10;
+            pct = Math.Min(pct, MaxPctIntoSpread);
+
+            return high - pct * spread - 1; // small undercut to beat the ask
         }
 
         // ---------- Helpers ----------
-
         private static string DecideSellingFormByAverage(PriceData out3P, PriceData out4P)
         {
             double perDose3Avg = Avg(out3P.High, out3P.Low) / 3.0;

@@ -8,30 +8,21 @@ namespace HerbloreCalculator
 {
     class Program
     {
-        // Your RSN used to fetch current Herblore XP from hiscores.
         private const string Rsn = "bottleo";
-
-        // Change this if you want to aim for 99, 200m, etc.
         private const double TargetXp = 200_000_000;
-
-        // API is fine with ~1 req/min.
         private const int RefreshSeconds = 60;
 
-        // Items we fetch alongside potions
-        private const int ChemAmuletId = 21163; // Amulet of chemistry (for proc charges)
-
-        // Quick “watch list” that prints current prices each refresh
+        private const int ChemAmuletId = 21163; // Amulet of chemistry
         private static readonly List<(int Id, string Name)> TrackedItems = new()
         {
             (24777, "Blood shard"),
-            // Add anything else: (12934, "Zulrah's scales"), ...
         };
 
         static async Task Main(string[] args)
         {
-            InitConsole(); // <- set window/buffer + initial clear
+            InitConsole();
 
-            // Potions driven by their item IDs and XP each
+            // Potions to show
             var potions = new List<Potion>
             {
                 new Potion("Saradomin brew(3)", 3002, 6693, 6687, 6685, 180.0),
@@ -40,12 +31,12 @@ namespace HerbloreCalculator
 
             while (true)
             {
-                ClearScreen(); // <- robust clear (screen + scrollback)
+                ClearScreen();
 
-                Console.WriteLine($"Bottleos Herb Calculator - {DateTime.Now}");
+                Console.WriteLine($"Bottleos Herb Calc V1.3 - {DateTime.Now}");
+                Console.WriteLine($"Mode: {Calculator.Mode}   (1 = Flow / 2 = Normal / 3 = Fast | R = Refresh now | Q = Quit)");
                 Console.WriteLine();
 
-                // 1) Pull your current Herblore XP (falls back to 0 if unranked)
                 var currentXp = await HiscoreFetcher.GetHerbloreXpAsync(Rsn);
                 double remainingXp = TargetXp;
                 if (currentXp.HasValue)
@@ -58,27 +49,19 @@ namespace HerbloreCalculator
                     Console.WriteLine($"Could not fetch XP for {Rsn}, assuming target from 0 XP.");
                 }
 
-                // Worst = buy inputs at high; sell outputs at low (impatient insta-buy/sell)
-                // Average = midpoint of high/low on both sides
-                // Best = buy inputs at low; sell outputs at high (patient flipping / tight margins)
-                Console.WriteLine(" Worst = Buy high, sell low (impatient) \n Average = Average.... \n Best = Buy inputs low, sell high. \n");
+                Console.WriteLine(" Worst = Buy high, sell low (impatient)");
+                Console.WriteLine(" Average = Average....");
+                Console.WriteLine(" Best = Buy inputs low, sell high.\n");
 
-                // 2) Pull all latest prices in a single API call (OSRS Wiki)
                 var prices = await PriceFetcher.GetLatestPricesAsync();
-
-                // 3) Print tracked items (simple dashboard at the top)
-                // (You moved the tracker to the bottom—leaving this placeholder to match your structure)
-
-                // Chemistry ammy price used for proc charge cost (passed to calculator)
                 prices.TryGetValue(ChemAmuletId, out var chemAmmyPrice);
 
-                // 4) Show each potion’s report (worst/avg/best)
                 foreach (var potion in potions)
                 {
                     Calculator.DisplayPotionReport(
                         potion,
                         prices,
-                        remainingXp > 0 ? remainingXp : TargetXp, // If we couldn’t fetch XP, use full target
+                        remainingXp > 0 ? remainingXp : TargetXp,
                         chemAmmyPrice
                     );
                     Console.WriteLine();
@@ -95,46 +78,70 @@ namespace HerbloreCalculator
                 }
                 Console.WriteLine();
 
-                Console.WriteLine($"Next update in {RefreshSeconds} seconds...");
-                await Task.Delay(RefreshSeconds * 1000);
+                // Wait with hotkeys
+                Console.WriteLine($"Next update in {RefreshSeconds} seconds...  (press 1/2/3/R/Q)");
+                if (!await WaitWithHotkeysAsync(TimeSpan.FromSeconds(RefreshSeconds)))
+                    break; // Q pressed -> exit
             }
         }
 
-        // --- Helpers to keep the console tidy ---
+        // ----- Hotkeys -----
+        private static async Task<bool> WaitWithHotkeysAsync(TimeSpan duration)
+        {
+            var end = DateTime.UtcNow + duration;
+            while (DateTime.UtcNow < end)
+            {
+                // Poll every 100ms for a key
+                for (int i = 0; i < 10; i++)
+                {
+                    if (Console.KeyAvailable)
+                    {
+                        var key = Console.ReadKey(intercept: true).Key;
+                        switch (key)
+                        {
+                            case ConsoleKey.D1:
+                            case ConsoleKey.NumPad1:
+                                Calculator.Mode = FlowMode.Flow;
+                                return true; // trigger immediate refresh
+                            case ConsoleKey.D2:
+                            case ConsoleKey.NumPad2:
+                                Calculator.Mode = FlowMode.Normal;
+                                return true;
+                            case ConsoleKey.D3:
+                            case ConsoleKey.NumPad3:
+                                Calculator.Mode = FlowMode.Fast;
+                                return true;
+                            case ConsoleKey.R:
+                                return true; // manual refresh
+                            case ConsoleKey.Q:
+                                return false; // quit
+                        }
+                    }
+                    await Task.Delay(100);
+                }
+            }
+            return true; // time elapsed -> refresh
+        }
 
+        // ----- Console helpers -----
         private static void InitConsole()
         {
             try
             {
-                // Use max possible height so you don't have to drag it every run
                 int targetWidth = Math.Min(140, Console.LargestWindowWidth);
-                int targetHeight = Console.LargestWindowHeight; // max height allowed
-
-                // Set window size first, then buffer
+                int targetHeight = Console.LargestWindowHeight;
                 Console.SetWindowSize(targetWidth, targetHeight);
                 Console.SetBufferSize(targetWidth, targetHeight);
             }
-            catch
-            {
-                // Ignore if console host doesn't allow resizing
-            }
+            catch { /* ignore if host doesn't allow resizing */ }
 
             ClearScreen();
         }
 
-
         private static void ClearScreen()
         {
-            try
-            {
-                // ANSI: clear screen, clear scrollback, move cursor to home
-                Console.Write("\x1b[2J\x1b[3J\x1b[H");
-            }
-            catch
-            {
-                // Fallback if ANSI not supported
-                Console.Clear();
-            }
+            try { Console.Write("\x1b[2J\x1b[3J\x1b[H"); }
+            catch { Console.Clear(); }
         }
     }
 }
