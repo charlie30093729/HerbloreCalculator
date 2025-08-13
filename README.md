@@ -16,9 +16,6 @@ Smart Pricing – Automatically determines reasonable “patient” buy prices i
 
 -----------------------------------------------------------
 
-
--TODO: implement vyrewatch alternate accounts to tracker
-
 -------------------------------------------------------
 
 
@@ -30,6 +27,8 @@ Add or remove potions by modifying the potions list in Program.cs.
 Add any item IDs you want to track in the TrackedItems list.
 
 📜 Version History
+
+v1.9 - Added vyrewatch alt accounts to the application.
 
 v1.8 - Flowmode changer to switch between suggested buy/sell offers at different margins.
 
