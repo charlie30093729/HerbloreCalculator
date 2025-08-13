@@ -44,7 +44,7 @@ namespace HerbloreCalculator
             {
                 ClearScreen();
 
-                Console.WriteLine($"Bottleos Herb Calc V1.3 - {DateTime.Now}");
+                Console.WriteLine($"Bottleos Herb Calculator - {DateTime.Now}");
                 Console.WriteLine($"Mode: {Calculator.Mode}   (1 = Flow / 2 = Normal / 3 = Fast | R = Refresh now | Q = Quit)");
                 Console.WriteLine();
 
