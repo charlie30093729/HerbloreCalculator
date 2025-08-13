@@ -31,6 +31,8 @@ Add any item IDs you want to track in the TrackedItems list.
 
 📜 Version History
 
+v1.8 - Flowmode changer to switch between suggested buy/sell offers at different margins.
+
 v1.7 - API Changes for hiscore fetching.
 
 v1.6 - Added G.E Tax calculations into total cost.
