@@ -31,6 +31,8 @@ Add any item IDs you want to track in the TrackedItems list.
 
 📜 Version History
 
+v1.7 - API Changes for hiscore fetching.
+
 v1.6 - Added G.E Tax calculations into total cost.
 
 v1.5 – Added potion ingredient suggested pricing, fixed refresh bug, fixed window size and formatting.
