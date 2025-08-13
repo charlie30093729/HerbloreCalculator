@@ -8,26 +8,37 @@ namespace HerbloreCalculator
 {
     class Program
     {
+        // ====== Config ======
         private const string Rsn = "bottleo";
         private const double TargetXp = 200_000_000;
         private const int RefreshSeconds = 60;
 
-        private const int ChemAmuletId = 21163; // Amulet of chemistry
+        // GE pricing helper: Amulet of chemistry (for proc calc in potion EV)
+        private const int ChemAmuletId = 21163;
+
+        // Quick watchlist (prints current high/low every refresh)
         private static readonly List<(int Id, string Name)> TrackedItems = new()
         {
             (24777, "Blood shard"),
+            // Add more: (12934, "Zulrah's scales"), ...
         };
+
+        // Potions to report
+        private static readonly List<Potion> Potions = new()
+        {
+            new Potion("Saradomin brew(3)", 3002, 6693, 6687, 6685, 180.0),
+            new Potion("Super restore(3)",  3004,  223, 3026, 3024, 142.5)
+        };
+
+        // Vyrewatch defaults
+        private const int VyreDefaultKillsPerHour = 100;
 
         static async Task Main(string[] args)
         {
             InitConsole();
 
-            // Potions to show
-            var potions = new List<Potion>
-            {
-                new Potion("Saradomin brew(3)", 3002, 6693, 6687, 6685, 180.0),
-                new Potion("Super restore(3)",  3004,  223, 3026, 3024, 142.5)
-            };
+            // Start in Normal mode (you can switch with hotkeys 1/2/3)
+            Calculator.Mode = FlowMode.Normal;
 
             while (true)
             {
@@ -37,6 +48,7 @@ namespace HerbloreCalculator
                 Console.WriteLine($"Mode: {Calculator.Mode}   (1 = Flow / 2 = Normal / 3 = Fast | R = Refresh now | Q = Quit)");
                 Console.WriteLine();
 
+                // 1) Hiscores: current Herblore XP and remaining to target
                 var currentXp = await HiscoreFetcher.GetHerbloreXpAsync(Rsn);
                 double remainingXp = TargetXp;
                 if (currentXp.HasValue)
@@ -46,29 +58,34 @@ namespace HerbloreCalculator
                 }
                 else
                 {
-                    Console.WriteLine($"Could not fetch XP for {Rsn}, assuming target from 0 XP.");
+                    Console.WriteLine($"Could not fetch XP for {Rsn}, assuming target from 0 XP.\n");
                 }
 
                 Console.WriteLine(" Worst = Buy high, sell low (impatient)");
                 Console.WriteLine(" Average = Average....");
                 Console.WriteLine(" Best = Buy inputs low, sell high.\n");
 
+                // 2) Live prices (OSRS Wiki latest)
                 var prices = await PriceFetcher.GetLatestPricesAsync();
+
+                // Chemistry amulet price (optional EV component in brew proc math)
                 prices.TryGetValue(ChemAmuletId, out var chemAmmyPrice);
 
-                foreach (var potion in potions)
+                // 3) Potion reports
+                foreach (var potion in Potions)
                 {
                     Calculator.DisplayPotionReport(
                         potion,
                         prices,
-                        remainingXp > 0 ? remainingXp : TargetXp,
+                        remainingXp > 0 ? remainingXp : TargetXp, // if no XP, assume full target
                         chemAmmyPrice
                     );
                     Console.WriteLine();
                 }
 
+                // 4) Item tracker
                 Console.WriteLine();
-                Console.WriteLine("Item tracker.... \n");
+                Console.WriteLine("=== Item Tracker ===\n");
                 foreach (var (Id, Name) in TrackedItems)
                 {
                     if (prices.TryGetValue(Id, out var p))
@@ -78,14 +95,18 @@ namespace HerbloreCalculator
                 }
                 Console.WriteLine();
 
-                // Wait with hotkeys
+                // 5) Vyrewatch Sentinels section (EV using selected drops + hourly supplies)
+                Vyrewatch.KillsPerHour = VyreDefaultKillsPerHour; // adjust if you want
+                Vyrewatch.DisplayReport(prices);
+
+                // 6) Wait with hotkeys
                 Console.WriteLine($"Next update in {RefreshSeconds} seconds...  (press 1/2/3/R/Q)");
                 if (!await WaitWithHotkeysAsync(TimeSpan.FromSeconds(RefreshSeconds)))
                     break; // Q pressed -> exit
             }
         }
 
-        // ----- Hotkeys -----
+        // ====== Hotkeys ======
         private static async Task<bool> WaitWithHotkeysAsync(TimeSpan duration)
         {
             var end = DateTime.UtcNow + duration;
@@ -101,18 +122,18 @@ namespace HerbloreCalculator
                         {
                             case ConsoleKey.D1:
                             case ConsoleKey.NumPad1:
-                                Calculator.Mode = FlowMode.Flow;
-                                return true; // trigger immediate refresh
+                                Calculator.Mode = FlowMode.Flow;   // near-instant fills
+                                return true; // refresh now
                             case ConsoleKey.D2:
                             case ConsoleKey.NumPad2:
-                                Calculator.Mode = FlowMode.Normal;
+                                Calculator.Mode = FlowMode.Normal; // balanced
                                 return true;
                             case ConsoleKey.D3:
                             case ConsoleKey.NumPad3:
-                                Calculator.Mode = FlowMode.Fast;
+                                Calculator.Mode = FlowMode.Fast;   // lenient
                                 return true;
                             case ConsoleKey.R:
-                                return true; // manual refresh
+                                return true;  // manual refresh
                             case ConsoleKey.Q:
                                 return false; // quit
                         }
@@ -120,10 +141,10 @@ namespace HerbloreCalculator
                     await Task.Delay(100);
                 }
             }
-            return true; // time elapsed -> refresh
+            return true; // timer elapsed -> refresh
         }
 
-        // ----- Console helpers -----
+        // ====== Console helpers ======
         private static void InitConsole()
         {
             try
@@ -133,7 +154,7 @@ namespace HerbloreCalculator
                 Console.SetWindowSize(targetWidth, targetHeight);
                 Console.SetBufferSize(targetWidth, targetHeight);
             }
-            catch { /* ignore if host doesn't allow resizing */ }
+            catch { /* ignore if terminal host restricts sizing */ }
 
             ClearScreen();
         }
