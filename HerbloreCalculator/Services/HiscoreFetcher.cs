@@ -1,56 +1,99 @@
 ﻿using System;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace HerbloreCalculator.Services
 {
     public static class HiscoreFetcher
     {
-        private static readonly HttpClient client = new HttpClient();
-        private const string UA = "HerbloreCalculator/1.0 (contact: Discord bottleo)";
+        private static readonly HttpClient Client = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(12)
+        };
 
-        // CSV endpoint (stable):
-        // https://secure.runescape.com/m=hiscore_oldschool/index_lite.ws?player=<name>
-        // Each line: rank,level,xp  (Overall first, then skills in fixed order)
-        // Herblore line index = 16 (0-based): Overall(0), Attack(1), ..., Mining(15), Herblore(16)
-        private const int HerbloreLineIndex = 16;
+        private const string UA = "HerbloreCalculator/1.0 (contact: Discord bottleo)";
+        private const string Endpoint = "https://api.wiseoldman.net/v2/players/";
 
         static HiscoreFetcher()
         {
-            client.DefaultRequestHeaders.UserAgent.ParseAdd(UA);
-            client.Timeout = TimeSpan.FromSeconds(12);
+            Client.DefaultRequestHeaders.UserAgent.ParseAdd(UA);
+            Client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         }
 
-        public static async Task<long?> GetHerbloreXpAsync(string rsn)
-        {
-            if (string.IsNullOrWhiteSpace(rsn)) return null;
+        // Back-compat for existing calls
+        public static Task<long?> GetHerbloreXpAsync(string rsn) => GetSkillXpAsync(rsn, "herblore");
 
-            var url = "https://secure.runescape.com/m=hiscore_oldschool/index_lite.ws?player="
-                      + Uri.EscapeDataString(rsn.Trim());
+        /// <summary>
+        /// Fetch XP for any skill from Wise Old Man:
+        /// latestSnapshot.data.skills.{skill}.experience
+        /// Skill name is case/space/underscore/hyphen-insensitive (e.g., "hit points", "RC", "herb").
+        /// </summary>
+        public static async Task<long?> GetSkillXpAsync(string rsn, string skill)
+        {
+            if (string.IsNullOrWhiteSpace(rsn) || string.IsNullOrWhiteSpace(skill)) return null;
+
+            var key = Normalize(skill);
+            if (key is null) return null;
 
             try
             {
-                using var resp = await client.GetAsync(url);
+                using var resp = await Client.GetAsync(Endpoint + Uri.EscapeDataString(rsn.Trim()));
                 if (!resp.IsSuccessStatusCode) return null;
 
-                var body = await resp.Content.ReadAsStringAsync();
-                // Guard: sometimes Windows \r\n
-                var lines = body.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                await using var s = await resp.Content.ReadAsStreamAsync();
+                using var doc = await JsonDocument.ParseAsync(s);
 
-                if (lines.Length <= HerbloreLineIndex) return null;
+                if (!doc.RootElement.TryGetProperty("latestSnapshot", out var snap)) return null;
+                if (!snap.TryGetProperty("data", out var data)) return null;
+                if (!data.TryGetProperty("skills", out var skills)) return null;
+                if (!skills.TryGetProperty(key, out var skillObj)) return null;
+                if (!skillObj.TryGetProperty("experience", out var exp)) return null;
 
-                var parts = lines[HerbloreLineIndex].Split(',');
-                if (parts.Length < 3) return null;
-
-                // parts[2] = xp
-                if (long.TryParse(parts[2], out var xp)) return xp;
-
+                if (exp.ValueKind == JsonValueKind.Number && exp.TryGetInt64(out var xp)) return xp;
+                if (exp.ValueKind == JsonValueKind.Number) return (long)exp.GetDouble();
                 return null;
             }
             catch
             {
                 return null;
             }
+        }
+
+        // Canonical WOM keys with common aliases.
+        private static string? Normalize(string raw)
+        {
+            var s = raw.Trim().ToLowerInvariant()
+                       .Replace(" ", "").Replace("_", "").Replace("-", "");
+
+            return s switch
+            {
+                "overall" => "overall",
+                "attack" => "attack",
+                "defence" or "defense" => "defence",
+                "strength" => "strength",
+                "hitpoints" or "hp" => "hitpoints",
+                "ranged" or "range" => "ranged",
+                "prayer" => "prayer",
+                "magic" => "magic",
+                "cooking" => "cooking",
+                "woodcutting" or "wc" => "woodcutting",
+                "fletching" => "fletching",
+                "fishing" => "fishing",
+                "firemaking" or "fm" => "firemaking",
+                "crafting" => "crafting",
+                "smithing" => "smithing",
+                "mining" => "mining",
+                "herblore" or "herb" => "herblore",
+                "agility" => "agility",
+                "thieving" => "thieving",
+                "slayer" => "slayer",
+                "farming" => "farming",
+                "runecrafting" or "runecraft" or "rc" => "runecrafting",
+                "hunter" => "hunter",
+                "construction" or "con" => "construction",
+                _ => null
+            };
         }
     }
 }
